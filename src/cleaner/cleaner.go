@@ -83,11 +83,7 @@ func (cl *Cleaner) CutoffAdder(paths <-chan string, toHarvesters chan<- CutoffDa
 		clientName := filepath.Base(path)
 
 		retentionDays := cl.customerInfo.GetRetentionDays(clientName)
-		log.Println(retentionDays)
 		cutoffDate := cl.currentTime.AddDate(0, 0, -retentionDays)
-		//log.Println(clientName)
-		//log.Println(cutoffDate.String())
-
 		deviceDirs, err := filepath.Glob(path + "/*")
 		if err != nil {
 			log.Printf("Couldn't get devices for client (err: %v, client: %s)", err, clientName)
@@ -111,7 +107,7 @@ func (cl *Cleaner) CutoffAdder(paths <-chan string, toHarvesters chan<- CutoffDa
 func WipeRoutine(toWipe <-chan string) {
 	for path := range toWipe {
 		os.RemoveAll(path)
-		//log.Printf("Wiping (%s)", path)
+		log.Printf("Wiping (%s)", path)
 	}
 }
 
@@ -133,7 +129,6 @@ func (cl *Cleaner) Harvester(inputs <-chan CutoffData, toNextHarvester chan<- Cu
 		}
 
 		for _, directory := range directories {
-			//log.Printf("Cheking directory (%s)", directory)
 			datePart := filepath.Base(directory)
 			datePartNum, err := strconv.ParseUint(datePart, 10, 64)
 			if err != nil {
@@ -141,13 +136,9 @@ func (cl *Cleaner) Harvester(inputs <-chan CutoffData, toNextHarvester chan<- Cu
 			}
 
 			cutoff := extractor(input.cutoffDate)
-			//log.Println(cutoff)
-			//log.Println(datePartNum)
 			if datePartNum == cutoff {
-				log.Printf("Passing further (%s)", directory)
 				toNextHarvester <- CutoffData{cutoffDate: input.cutoffDate, path: directory}
 			} else if datePartNum < cutoff {
-				log.Printf("Scheduling wipe (%s)", directory)
 				cl.toWipe <- directory
 			}
 		}
