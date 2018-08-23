@@ -1,0 +1,46 @@
+Prerequisites:
+    Make sure you have GO installed and GOROOT populated
+    have python3 in path
+
+How to run it:
+    execute start.sh script from root directory of this project
+
+How to play with it:
+    start cleanerapp with -h flag
+
+How it works:
+    App is split into goroutine pipeline
+    1. Find all client folders
+    2. For each client calculate cutoff date (end of retention period) and append to each device directory found
+       from this point on next stages operate on (path, cutoffDate) tuple where path is extended as needed
+    Next steps: Descend into date named folders comparing current date part with predicate based on cutoff date
+    For each such step theres three cases:
+    datePart == cutoffPart - pass to next stage
+    datePart < cutoffPart  - pass to removal goroutine
+    datePart > cutoffPart  - do nothing, should be retained
+
+    Such steps are done for year then month then day, which assures that theres no unnecessary subtree traversal.
+    I.e theres no point in checking months/days when year is 2019 and cutoff is somewhere in 2018
+
+Assumptions:
+    Theres no rogue files in data hierarchy
+        if theres a regular file it will be probably skipped but didn't test that
+    First day to be deleted is one before cutoff date
+        No digging with hours/minute/second was done, it could be added fairly easy, see src/cleaner/cleaner.go:work
+
+Considerations:
+    Resolution is to days only
+        finer granularity could be added by defining more staged (based on hours etc)
+        to src/cleaner/cleaner.go:Work function following Harvesters pattern
+    Removal cost
+        In case whole year with full data is scheduled for deletion application may hang,
+        logic to handle such case may be added to src/cleaner/cleaner.go:wipeRoutine
+    Load reduction
+        App has currently possibility to inject deal between each removal action using console flag
+        something smarter may be added there like basing delay on system load monitoring
+        app could also have "nice" value set to yield to other system processes
+    Arbitrary delays between app runs
+        App will find all stale data but may take significant resources if delay is long,
+        needs some realistic data set to test that
+    Switching client retention data source
+        Made some naive interface for that, resides in src/cleaner/customerinfo.go
