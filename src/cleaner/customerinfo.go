@@ -2,8 +2,8 @@ package cleaner
 
 import (
 	"encoding/json"
-	"os"
 	"io"
+	"os"
 )
 
 type CustomerInfo interface {
@@ -11,7 +11,7 @@ type CustomerInfo interface {
 }
 
 type FileCustomerInfo struct {
-	data map[string]int
+	data             map[string]int
 	defaultRetention int
 }
 

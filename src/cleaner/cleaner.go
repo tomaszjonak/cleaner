@@ -13,25 +13,25 @@ type CutoffData struct {
 	path       string
 }
 
-
 type Cleaner struct {
 	rootDir      string
 	currentTime  time.Time
 	customerInfo CustomerInfo
 	toWipe       chan string
+	removalDelay time.Duration
 }
 
 const (
-	WipeQueueLength = 2
+	WipeQueueLength      = 2
 	HarvesterQueueLength = 1
 )
 
-func NewCleaner(currentTime time.Time, rootDir string, customerInfo CustomerInfo) *Cleaner {
+func NewCleaner(currentTime time.Time, rootDir string, customerInfo CustomerInfo, removalDelay time.Duration) *Cleaner {
 	return &Cleaner{
 		rootDir:      rootDir,
 		currentTime:  currentTime,
 		customerInfo: customerInfo,
-		toWipe:       make(chan string, WipeQueueLength),
+		removalDelay: removalDelay,
 	}
 }
 
@@ -42,6 +42,7 @@ func (cl *Cleaner) Work() {
 	yearToMonth := make(chan CutoffData, HarvesterQueueLength)
 	monthToDay := make(chan CutoffData, HarvesterQueueLength)
 	dayToFin := make(chan CutoffData, HarvesterQueueLength)
+	cl.toWipe = make(chan string, WipeQueueLength)
 
 	go ClientFinder(cl.rootDir, clientPaths)
 	go cl.CutoffAdder(clientPaths, clientToYear)
@@ -58,7 +59,7 @@ func (cl *Cleaner) Work() {
 
 	go cl.DeadEnd(dayToFin)
 
-	WipeRoutine(cl.toWipe)
+	cl.WipeRoutine(cl.toWipe)
 }
 
 // ClientFinder scans root directory searching for client directories
@@ -104,10 +105,11 @@ func (cl *Cleaner) CutoffAdder(paths <-chan string, toHarvesters chan<- CutoffDa
 // 2. Monitor system load in another goroutine, inject sleep period between files
 // Moreover, in case this app finds whole year of data to delete, some heuristic should
 // be used to split this task into smaller pieces
-func WipeRoutine(toWipe <-chan string) {
+func (cl *Cleaner) WipeRoutine(toWipe <-chan string) {
 	for path := range toWipe {
 		os.RemoveAll(path)
-		log.Printf("Wiping (%s)", path)
+		log.Printf("Wiped (%s)", path)
+		<-time.After(cl.removalDelay)
 	}
 }
 
